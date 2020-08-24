@@ -13,9 +13,9 @@ import matplotlib.pyplot as plt
 #put breathing data here as a numpy array
 import pandas as pd
 from scipy import signal
-from entropy import *
+
 import scipy.io as sio
-from entropy import spectral_entropy
+
 from scipy.signal import periodogram, welch
 from scipy.signal import find_peaks
 from scipy.stats import kurtosis
@@ -27,15 +27,16 @@ import matplotlib.pyplot as plt
 #put breathing data here as a numpy array
 import pandas as pd
 from scipy import signal
+from pyentrp import entropy as ent
 label = 'upper_belt'
-df = pd.read_csv('/media/shruti/Data/Breathing/lab/labels.csv', delimiter=',')
+df = pd.read_csv('/media/shruti/Data/Breathing_project/Interspeech_Breathing/lab/labels.csv', delimiter=',')
 print(df.shape)
 breathing=np.empty((6000,0))
 #y_devel = df[label][df['filename'].str.startswith('devel')].values
 #print('deve', y_devel.shape)
 num = ['00', '01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12', '13', '14','15']
 from mne_features.univariate import compute_spect_slope
-output_cols=['bndpwr_0.25','bndpwr_0.5','bndpwr_1.5','entropy','peak1_2','peak1_3', 'kurtosis', 'skew', 'centroid', 'flatness', 'max_freq', 'labels']
+output_cols = ['bnd_pwr_0_25','bnd_pwr_25_50','bnd_pwr_50_150','entropy','p1_p2','p1_p3','kurt','sknew','flatness','peak_f','ratio_25', 'ratio_50','ratio_150','perm_ent', 'labels']
 def FeatureSpectralFlatness(X, f_s):
 
     norm = X.mean(axis=0, keepdims=True)
@@ -47,7 +48,7 @@ def FeatureSpectralFlatness(X, f_s):
 
     return (vtf)
 
-feat = np.empty((0, 11))
+feat = np.empty((0, 14))
 for i in num:
     print(i)
     df2 = df.loc[df['filename'] == 'devel_'+ i+ '.wav']
@@ -82,14 +83,15 @@ for i in num:
 
 
     fs=4  #sampling frequency
-    w_size =  15 * fs   # window size in seconds
-    w_shift = 4 * w_size  # window overlap
+    w_size =  20 * fs   # window size in seconds
+    w_shift = 15 * fs  # window overlap
 
     #compute short time fourier transform
     rfft_spect_h = ama.strfft_spectrogram(br, fs, w_size, w_shift, win_function = 'hamming' )
     power_spect_h = sum(sum(rfft_spect_h['power_spectrogram']))[0] * rfft_spect_h['freq_delta'] * rfft_spect_h['time_delta']
     print(rfft_spect_h['power_spectrogram'].shape[0])
-    
+    br_epoch,_,_=ama.epoching(br, w_size, 5*fs)
+    br_epoch = br_epoch.squeeze()
 
    
     for ix in range(0,rfft_spect_h['power_spectrogram'].shape[0]):
@@ -137,8 +139,7 @@ for i in num:
         #print(feat_7)
         feat_8 = skew(psd) 
         #print(feat_8)
-        cent = librosa.feature.spectral_centroid(y=psd)
-        feat_9 = np.mean(cent.T, axis=0)
+       
         #print(feat_9)
         
         
@@ -147,7 +148,22 @@ for i in num:
         #print(feat_10)
         
         feat_11 = a[np.argmax(psd)]
-        feat_c=np.hstack((feat_1, feat_2, feat_3, feat_4, feat_5, feat_6, feat_7, feat_8, feat_9, feat_10, feat_11))
+    
+        #in band vs out of band ratio for feat 1
+        feat_12=feat_1/(feat_2+feat_3)
+    
+        #in band vs out of band ratio for feat 1
+        feat_13=feat_2/(feat_1+feat_3)
+    
+        #in band vs out of band ratio for feat 1
+        feat_14=feat_3/(feat_1+feat_2)
+    
+        #get timeseries entropy (PE)
+        lag=1
+        x_ = br_epoch[:, ix]
+        print(x_.shape)
+        feat_15=ent.permutation_entropy(x_,3,lag)
+        feat_c=np.hstack((feat_1, feat_2, feat_3, feat_4, feat_5, feat_6, feat_7, feat_8, feat_10, feat_11,feat_12,feat_13,feat_14,feat_15))
         feat=np.vstack((feat,feat_c))
 n= feat.shape[0]
 print(n)
@@ -157,5 +173,5 @@ feat = np.hstack((feat,X0))
 print(feat.shape)
 
 df=pd.DataFrame(feat,columns=output_cols)
-df.to_csv('breathing_talk_devel.csv',index=None)
+df.to_csv('/media/shruti/Data/Breathing_project/breathing_talk_devel_new.csv',index=None)
 			
